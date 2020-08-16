@@ -30,9 +30,9 @@ func (s Slack_handler) Events(w http.ResponseWriter, r *http.Request) {
 	s.Logger.Info("Received a slack event")
 
 	buf := new(bytes.Buffer)
-		buf.ReadFrom(r.Body)
-		body := buf.String()
-		eventsAPIEvent, err := slackevents.ParseEvent(json.RawMessage(body), slackevents.OptionNoVerifyToken())
+	buf.ReadFrom(r.Body)
+	body := buf.String()
+	eventsAPIEvent, err := slackevents.ParseEvent(json.RawMessage(body), slackevents.OptionNoVerifyToken())
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(fmt.Sprintf("Error: %+v", err)))
@@ -49,6 +49,8 @@ func (s Slack_handler) Events(w http.ResponseWriter, r *http.Request) {
 			}
 			w.Header().Set("Content-Type", "text")
 			w.Write([]byte(r.Challenge))
+			s.Logger.Info("Slack challenge completed")
+			return
 		}
 		if eventsAPIEvent.Type == slackevents.CallbackEvent {
 			innerEvent := eventsAPIEvent.InnerEvent
@@ -56,6 +58,10 @@ func (s Slack_handler) Events(w http.ResponseWriter, r *http.Request) {
 			case *slackevents.AppMentionEvent:
 				s.Api.PostMessage(ev.Channel, slack.MsgOptionText("Yes, hello.", false))
 			}
+			return
 		}
-
+	
+	w.WriteHeader(http.StatusBadRequest)
+	w.Write([]byte(fmt.Sprintf("Error: Unknown event")))
+	s.Logger.Error("Error receiving unknown slack event")
 }
