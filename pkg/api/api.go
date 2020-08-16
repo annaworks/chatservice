@@ -43,12 +43,10 @@ func (a Api) load_routes() error {
 	health_handler := handlers.Health_handler{
 		Logger: a.logger.Named("health_handler"),
 	}
-	// slack
-	slack_handler := handlers.Slack_handler{
-		Logger: a.logger.Named("slack_handler"),
-		Conf: a.conf,
-	}
 	v1.HandleFunc("/health", health_handler.Ping).Methods(http.MethodGet)
+
+	// slack
+	slack_handler := handlers.NewSlackHandler(a.logger.Named("slack_handler"), a.conf)
 	v1.HandleFunc("/slack", slack_handler.Events).Methods(http.MethodPost)
 
 	return nil
