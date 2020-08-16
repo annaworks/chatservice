@@ -32,11 +32,7 @@ func (s Slack_handler) Events(w http.ResponseWriter, r *http.Request) {
 	buf := new(bytes.Buffer)
 		buf.ReadFrom(r.Body)
 		body := buf.String()
-		eventsAPIEvent, err := slackevents.ParseEvent(json.RawMessage(body), slackevents.OptionVerifyToken(
-			&slackevents.TokenComparator {
-				VerificationToken: s.Conf.SLACK_VERIFICATION_TOKEN,
-			},
-		))
+		eventsAPIEvent, err := slackevents.ParseEvent(json.RawMessage(body), slackevents.OptionNoVerifyToken())
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(fmt.Sprintf("Error: %+v", err)))

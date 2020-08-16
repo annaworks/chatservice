@@ -15,5 +15,4 @@ services:
         environment:
             API_PORT: "${API_PORT}"
             SLACK_TOKEN: "${SLACK_TOKEN}"
-            SLACK_VERIFICATION_TOKEN: "${SLACK_VERIFICATION_TOKEN}"
             

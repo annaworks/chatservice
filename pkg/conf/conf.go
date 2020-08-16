@@ -11,7 +11,6 @@ type Conf struct {
 
 	// slack
 	SLACK_TOKEN              string `envconfig:"SLACK_TOKEN"`
-	SLACK_VERIFICATION_TOKEN string `envconfig:"SLACK_VERIFICATION_TOKEN"`
 }
 
 func NewConf(logger *zap.Logger) Conf {
