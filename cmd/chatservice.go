@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	"gitlab.com/kennylouie/chatservice/pkg/api"
-	Conf "gitlab.com/kennylouie/chatservice/pkg/conf"
+	"github.com/annaworks/chatservice/pkg/api"
+	Conf "github.com/annaworks/chatservice/pkg/conf"
 
 	"go.uber.org/zap"
 )
