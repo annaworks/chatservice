@@ -49,6 +49,9 @@ func (a Api) load_routes() error {
 	slack_handler := handlers.NewSlackHandler(a.logger.Named("slack_handler"), a.conf)
 	v1.HandleFunc("/slack", slack_handler.Events).Methods(http.MethodPost)
 
+	action_handler := handlers.NewActionHandler(a.logger.Named("action_handler"), a.conf)
+	v1.HandleFunc("/action", action_handler.Events).Methods(http.MethodPost)
+
 	return nil
 }
 
