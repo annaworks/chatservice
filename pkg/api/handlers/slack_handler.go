@@ -2,14 +2,12 @@ package handlers
 
 import (
 	"fmt"
-	"bytes"
 	"encoding/json"
 	"net/http"
 
 	"go.uber.org/zap"
 	Conf "github.com/annaworks/chatservice/pkg/conf"
 	"github.com/slack-go/slack"
-	"github.com/slack-go/slack/slackevents"
 )
 
 type Slack_handler struct {
@@ -29,32 +27,7 @@ func NewSlackHandler(logger *zap.Logger, conf Conf.Conf) Slack_handler {
 const slash_command = "/annabot"
 
 func (s Slack_handler) Events(w http.ResponseWriter, r *http.Request) {
-	s.Logger.Info("Received a slack event")
-
-	// slack verification
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(r.Body)
-	body := buf.String()
-	eventsAPIEvent, err := slackevents.ParseEvent(json.RawMessage(body), slackevents.OptionNoVerifyToken())
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf("Error: %+v", err)))
-		s.Logger.Error("Error in parsing event", zap.Error(err))
-		return
-	}
-
-	if eventsAPIEvent.Type == slackevents.URLVerification {
-		var r *slackevents.ChallengeResponse
-		err := json.Unmarshal([]byte(body), &r)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "text")
-		w.Write([]byte(r.Challenge))
-		s.Logger.Info("Slack challenge completed")
-		return
-	}
+	s.Logger.Info("Received a slash command")
 
 	// slack slash command
 	slash, err := slack.SlashCommandParse(r)
@@ -117,6 +90,8 @@ func (s Slack_handler) Events(w http.ResponseWriter, r *http.Request) {
 			s.Logger.Info("Message with buttons sucessfully sent")
 			return 
 		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			s.Logger.Error("Command not found")
 			return
 	}
 }
