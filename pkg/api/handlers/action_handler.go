@@ -16,6 +16,24 @@ type Action_handler struct {
 	Api *slack.Client
 }
 
+type ButtonActionPayload struct {
+	Question string
+	Username string
+	UserID string
+	ButtonClicked string
+	TriggerID string
+}
+
+func NewButtonActionPayload(question string, username string, userID string, buttonClicked string, triggerID string) ButtonActionPayload {
+	return ButtonActionPayload {
+		Question: question,
+		Username: username,
+		UserID: userID,
+		ButtonClicked: buttonClicked,
+		TriggerID: triggerID,
+	}
+}
+
 func NewActionHandler(logger *zap.Logger, conf Conf.Conf) Action_handler {
 	return Action_handler {
 		Logger: logger,
@@ -24,14 +42,12 @@ func NewActionHandler(logger *zap.Logger, conf Conf.Conf) Action_handler {
 	}
 }
 
-func newViewRequest() slack.ModalViewRequest {
-	// Create a ModalViewRequest with a header and two inputs
+func (p ButtonActionPayload) newViewRequest() slack.ModalViewRequest {
 	titleText := slack.NewTextBlockObject("plain_text", "View Answers", false, false)
 	closeText := slack.NewTextBlockObject("plain_text", "Close", false, false)
 	submitText := slack.NewTextBlockObject("plain_text", "Submit", false, false)
 
-	headerContent := fmt.Sprintf("*Question: *")
-	headerText := slack.NewTextBlockObject("mrkdwn", headerContent, false, false)
+	headerText := slack.NewTextBlockObject("mrkdwn", p.Question, false, false)
 	headerSection := slack.NewSectionBlock(headerText, nil, nil)
 
 	firstNameText := slack.NewTextBlockObject("plain_text", "First Name", false, false)
@@ -62,16 +78,16 @@ func newViewRequest() slack.ModalViewRequest {
 	return modalRequest
 }
 
-func newAnswerRequest() slack.ModalViewRequest {
-	// Create a ModalViewRequest with a header and two inputs
-	titleText := slack.NewTextBlockObject("plain_text", "Add an Answer", false, false)
+func (p ButtonActionPayload) newAnswerRequest() slack.ModalViewRequest {
+	titleText := slack.NewTextBlockObject("plain_text", "Add an answer", false, false)
 	closeText := slack.NewTextBlockObject("plain_text", "Cancel", false, false)
 	submitText := slack.NewTextBlockObject("plain_text", "Submit", false, false)
 
-	answerText := slack.NewTextBlockObject("plain_text", "How to setup a go api?", false, false)
+	answerText := slack.NewTextBlockObject("plain_text", p.Question, false, false)
 	answerPlaceholder := slack.NewTextBlockObject("plain_text", "Write something", false, false)
 	answerElement := slack.NewPlainTextInputBlockElement(answerPlaceholder, "answer")
-	answer := slack.NewInputBlock("Answer 1", answerText, answerElement)
+	answerElement.Multiline = true
+	answer := slack.NewInputBlock("Answer", answerText, answerElement)
 
 	blocks := slack.Blocks{
 		BlockSet: []slack.Block{
@@ -88,6 +104,10 @@ func newAnswerRequest() slack.ModalViewRequest {
 	return modalRequest
 }
 
+func getQuestion (payload *slack.InteractionCallback) string {
+	return fmt.Sprintf("*%v*", payload.Message.Msg.Text)
+}
+
 func (s Action_handler) Events(w http.ResponseWriter, r *http.Request) {
 	s.Logger.Info("Received a slack action")
 
@@ -97,20 +117,41 @@ func (s Action_handler) Events(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("Could not parse action response JSON: %v", err)
 
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf("Error: Unknown event")))
-		s.Logger.Error("Error receiving unknown slack event")
+		w.Write([]byte(fmt.Sprintf("Error: Unknown action")))
+		s.Logger.Error("Error receiving unknown slack action")
 		return
 	}
 
+	// Get the question text from the Message payload
+	var message string
+	for _, b := range payload.Message.Msg.Blocks.BlockSet {
+		switch b.BlockType() {
+		case "section":
+			s := b.(*slack.SectionBlock)
+			message = s.Fields[0].Text
+		default:
+			fmt.Println("not section")
+		}
+	}
+
+	// Configure the payload for use in action handler methods
+	p := NewButtonActionPayload(
+		message,
+		payload.User.Name, 
+		payload.User.ID,
+		payload.ActionCallback.BlockActions[0].Value,
+		payload.TriggerID,
+	)
+
 	switch payload.ActionCallback.BlockActions[0].Value {
 	case "view_clicked":
-		modalRequest := newViewRequest()
+		modalRequest := p.newViewRequest()
 		_, err = s.Api.OpenView(payload.TriggerID, modalRequest)
 		if err != nil {
 			fmt.Printf("Error opening view: %s", err)
 		}
 	case "answer_clicked":
-		modalRequest := newAnswerRequest()
+		modalRequest := p.newAnswerRequest()
 		_, err = s.Api.OpenView(payload.TriggerID, modalRequest)
 		if err != nil {
 			fmt.Printf("Error opening view: %s", err)
