@@ -109,7 +109,7 @@ func (s Action_handler) Events(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			fmt.Printf("Error opening view: %s", err)
 		}
-	case "action_clicked":
+	case "answer_clicked":
 		modalRequest := newAnswerRequest()
 		_, err = s.Api.OpenView(payload.TriggerID, modalRequest)
 		if err != nil {
