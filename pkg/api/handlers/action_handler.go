@@ -24,7 +24,7 @@ type ButtonActionPayload struct {
 	TriggerID string
 }
 
-func NewButtonActionPayload(question string, username string, userID string, buttonClicked string, triggerID string) ButtonActionPayload {
+func NewButtonActionPayload(question, username, userID, buttonClicked, triggerID string) ButtonActionPayload {
 	return ButtonActionPayload {
 		Question: question,
 		Username: username,
@@ -43,29 +43,22 @@ func NewActionHandler(logger *zap.Logger, conf Conf.Conf) Action_handler {
 }
 
 func (p ButtonActionPayload) newViewRequest() slack.ModalViewRequest {
-	titleText := slack.NewTextBlockObject("plain_text", "View Answers", false, false)
+	titleText := slack.NewTextBlockObject("plain_text", "View answers", false, false)
 	closeText := slack.NewTextBlockObject("plain_text", "Close", false, false)
-	submitText := slack.NewTextBlockObject("plain_text", "Submit", false, false)
+	submitText := slack.NewTextBlockObject("plain_text", "Add answer", false, false)
 
-	headerText := slack.NewTextBlockObject("mrkdwn", p.Question, false, false)
+	headerContent := fmt.Sprintf("*Question:*\n %v", p.Question)
+	headerText := slack.NewTextBlockObject("mrkdwn", headerContent, false, false)
 	headerSection := slack.NewSectionBlock(headerText, nil, nil)
 
-	firstNameText := slack.NewTextBlockObject("plain_text", "First Name", false, false)
-	firstNamePlaceholder := slack.NewTextBlockObject("plain_text", "Enter your first name", false, false)
-	firstNameElement := slack.NewPlainTextInputBlockElement(firstNamePlaceholder, "firstName")
-	// Notice that blockID is a unique identifier for a block
-	firstName := slack.NewInputBlock("First Name", firstNameText, firstNameElement)
-
-	lastNameText := slack.NewTextBlockObject("plain_text", "Last Name", false, false)
-	lastNamePlaceholder := slack.NewTextBlockObject("plain_text", "Enter your first name", false, false)
-	lastNameElement := slack.NewPlainTextInputBlockElement(lastNamePlaceholder, "lastName")
-	lastName := slack.NewInputBlock("Last Name", lastNameText, lastNameElement)
+	// Empty state on initial view
+	emptyContentText := slack.NewTextBlockObject("plain_text", "There are currently no answers for this question.", false, false)
+	emptyContentSection := slack.NewSectionBlock(emptyContentText, nil, nil)
 
 	blocks := slack.Blocks{
 		BlockSet: []slack.Block{
 			headerSection,
-			firstName,
-			lastName,
+			emptyContentSection,
 		},
 	}
 
@@ -102,10 +95,6 @@ func (p ButtonActionPayload) newAnswerRequest() slack.ModalViewRequest {
 	modalRequest.Submit = submitText
 	modalRequest.Blocks = blocks
 	return modalRequest
-}
-
-func getQuestion (payload *slack.InteractionCallback) string {
-	return fmt.Sprintf("*%v*", payload.Message.Msg.Text)
 }
 
 func (s Action_handler) Events(w http.ResponseWriter, r *http.Request) {
