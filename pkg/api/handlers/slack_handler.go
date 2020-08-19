@@ -40,24 +40,21 @@ func (s Slack_handler) Events(w http.ResponseWriter, r *http.Request) {
 
 	switch slash.Command {
 		case slash_command:
-			fmt.Printf("%+v\n", slash.Text)
-			fmt.Printf("%+v\n", slash.UserName)
-
-			// Header Section
-			// headerText := slack.NewTextBlockObject("mrkdwn", "You asked a question", false, false)
-			// headerSection := slack.NewSectionBlock(headerText, nil, nil)
-
-			// Divider 
-			// divSection := slack.NewDividerBlock()
+			fmt.Printf("Message: %+v\n", slash.Text)
+			fmt.Printf("User: %+v\n", slash.UserName)
 
 			// Fields
-			questionText := fmt.Sprintf("*%v asked:*\n%v", slash.UserName, slash.Text)
-			questionField := slack.NewTextBlockObject("mrkdwn", questionText, false, false)
+			questionField := slack.NewTextBlockObject("mrkdwn", slash.Text, false, false)
 
 			fieldSlice := make([]*slack.TextBlockObject, 0)
 			fieldSlice = append(fieldSlice, questionField)
 
 			fieldsSection := slack.NewSectionBlock(nil, fieldSlice, nil)
+
+			// Context
+			userContextContent := fmt.Sprintf("Asked by @%v", slash.UserName)
+			userContextText := slack.NewTextBlockObject(slack.MarkdownType, userContextContent, false, false)	
+			userContextBlock := slack.NewContextBlock("context", userContextText)
 
 			// Action Buttons
 			viewBtnTxt := slack.NewTextBlockObject("plain_text", "View", false, false)
@@ -70,9 +67,8 @@ func (s Slack_handler) Events(w http.ResponseWriter, r *http.Request) {
 
 			// Build Message with blocks created above
 			msg := slack.NewBlockMessage(
-				// headerSection,
-				// divSection,
 				fieldsSection,
+				userContextBlock,
 				actionBlock,
 			)
 			msg.ResponseType = slack.ResponseTypeInChannel
