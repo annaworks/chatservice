@@ -87,6 +87,21 @@ func getQuestionText(payload slack.InteractionCallback) (string, error)  {
 	return message, nil
 }
 
+func getQuestionFromMessageInput(payload slack.InteractionCallback) (string, error) {
+	var message string
+	loop:for _, b := range payload.View.Blocks.BlockSet {
+		switch b.BlockType() {
+		case slack.MBTInput:
+			s := b.(*slack.InputBlock)
+			message = s.Label.Text
+			break loop
+		default:
+			return message, errors.New(fmt.Sprintf("Error: Unknown block type found in view submission: %v", b.BlockType()))
+		}
+	}
+	return message, nil
+}
+
 func (p ButtonActionPayload) newViewRequest() slack.ModalViewRequest {
 	titleText := slack.NewTextBlockObject("plain_text", "View answers", false, false)
 	closeText := slack.NewTextBlockObject("plain_text", "Close", false, false)
@@ -193,6 +208,18 @@ func (s Action_handler) Events(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 			}
+		
+		case slack.InteractionTypeViewSubmission:
+			// message, err := getQuestionFromMessageInput(payload)
+			// if err != nil {
+			// 	fmt.Printf("Error getting question from view submission: %v", err)
+			// 	w.WriteHeader(http.StatusBadRequest)
+			// 	w.Write([]byte(fmt.Sprintf("Error: Unknown view submission")))
+			// 	s.Logger.Error("Error getting question from view submission")
+			// 	return
+			// }
+
+			//TODO: query es using the question from message input - to get question id to save message input with
 
 		default:
 			fmt.Printf("Unknown interaction callback type: %v", err)
