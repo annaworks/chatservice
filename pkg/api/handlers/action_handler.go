@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"encoding/json"
 	"net/http"
+	"errors"
 
 	"go.uber.org/zap"
 	Conf "github.com/annaworks/chatservice/pkg/conf"
+	// "github.com/annaworks/chatservice/pkg/es"
 	"github.com/slack-go/slack"
 )
 
@@ -24,7 +26,35 @@ type ButtonActionPayload struct {
 	TriggerID string
 }
 
-func NewButtonActionPayload(question, username, userID, buttonClicked, triggerID string) ButtonActionPayload {
+type Question struct {
+	Question  string `json:"question"`
+	User      string `json:"user"`
+}
+
+func NewQuestion(value, user string) *Question {
+	return &Question{
+		Question:  value,
+		User:      user,
+	}
+}
+
+const EsQuestionMapping = `{
+	"settings": {
+		"number_of_shards": 3,
+		"number_of_replicas": 1
+	},
+	"mappings": {
+		"question": {
+			"properties": {
+				"user": {"type": "text"},
+				"value": {"type": "text"}
+			}
+		}
+	}
+}`
+
+
+func newButtonActionPayload(question, username, userID, buttonClicked, triggerID string) ButtonActionPayload {
 	return ButtonActionPayload {
 		Question: question,
 		Username: username,
@@ -40,6 +70,21 @@ func NewActionHandler(logger *zap.Logger, conf Conf.Conf) Action_handler {
 		Conf: conf,
 		Api: slack.New(conf.SLACK_TOKEN),
 	}
+}
+
+func getQuestionText(payload slack.InteractionCallback) (string, error)  {
+	var message string
+	loop:for _, b := range payload.Message.Msg.Blocks.BlockSet {
+		switch b.BlockType() {
+		case "section":
+			s := b.(*slack.SectionBlock)
+			message = s.Fields[0].Text
+			break loop
+		default:
+			return message, errors.New(fmt.Sprintf("Error: Unknown block type found in block action: %v", b.BlockType()))
+		}
+	}
+	return message, nil
 }
 
 func (p ButtonActionPayload) newViewRequest() slack.ModalViewRequest {
@@ -104,27 +149,23 @@ func (s Action_handler) Events(w http.ResponseWriter, r *http.Request) {
 	err := json.Unmarshal([]byte(r.FormValue("payload")), &payload)
 	if err != nil {
 		fmt.Printf("Could not parse action response JSON: %v", err)
-
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(fmt.Sprintf("Error: Unknown action")))
 		s.Logger.Error("Error receiving unknown slack action")
 		return
 	}
 
-	// Get the question text from the Message payload
-	var message string
-	for _, b := range payload.Message.Msg.Blocks.BlockSet {
-		switch b.BlockType() {
-		case "section":
-			s := b.(*slack.SectionBlock)
-			message = s.Fields[0].Text
-		default:
-			fmt.Println("not section")
-		}
+	message, err := getQuestionText(payload)
+	if err != nil {
+		fmt.Printf("Error getting question from interaction callback: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(fmt.Sprintf("Error: Unknown interaction callback")))
+		s.Logger.Error("Error getting question from interaction callback")
+		return
 	}
 
 	// Configure the payload for use in action handler methods
-	p := NewButtonActionPayload(
+	p := newButtonActionPayload(
 		message,
 		payload.User.Name, 
 		payload.User.ID,
@@ -132,24 +173,34 @@ func (s Action_handler) Events(w http.ResponseWriter, r *http.Request) {
 		payload.TriggerID,
 	)
 
-	switch payload.ActionCallback.BlockActions[0].Value {
-	case "view_clicked":
-		modalRequest := p.newViewRequest()
-		_, err = s.Api.OpenView(payload.TriggerID, modalRequest)
-		if err != nil {
-			fmt.Printf("Error opening view: %s", err)
-		}
-	case "answer_clicked":
-		modalRequest := p.newAnswerRequest()
-		_, err = s.Api.OpenView(payload.TriggerID, modalRequest)
-		if err != nil {
-			fmt.Printf("Error opening view: %s", err)
-		}
-	default:
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	switch payload.Type {
+		case slack.InteractionTypeBlockActions:
+			// Check the buttonID value of interaction
+			switch payload.ActionCallback.BlockActions[0].Value {
+				case "view_clicked":
+					modalRequest := p.newViewRequest()
+					_, err = s.Api.OpenView(payload.TriggerID, modalRequest)
+					if err != nil {
+						fmt.Printf("Error opening view: %s", err)
+					}
+				case "answer_clicked":
+					modalRequest := p.newAnswerRequest()
+					_, err = s.Api.OpenView(payload.TriggerID, modalRequest)
+					if err != nil {
+						fmt.Printf("Error opening view: %s", err)
+					}
+				default:
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+			}
+
+		default:
+			fmt.Printf("Unknown interaction callback type: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(fmt.Sprintf("Error: Unknown interaction callback type")))
+			s.Logger.Error("Error receiving unknown interaction callback type")
+			return
 	}
 
-	fmt.Printf("Payload %+v", payload)
-	fmt.Printf("Message button pressed by user %s with value %s", payload.User.Name, payload.ActionCallback.BlockActions[0].Value)
+	// fmt.Printf("Payload %+v", payload)
 }

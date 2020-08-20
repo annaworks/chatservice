@@ -7,7 +7,6 @@ import (
 	Conf "github.com/annaworks/chatservice/pkg/conf"
 
 	"github.com/olivere/elastic"
-	"go.uber.org/zap"
 )
 
 type es struct {

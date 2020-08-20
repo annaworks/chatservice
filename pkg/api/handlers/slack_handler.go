@@ -24,7 +24,7 @@ func NewSlackHandler(logger *zap.Logger, conf Conf.Conf) Slack_handler {
 	}
 }
 
-const slash_command = "/annabot"
+const slash_command = "/suru"
 
 func (s Slack_handler) Events(w http.ResponseWriter, r *http.Request) {
 	s.Logger.Info("Received a slash command")
