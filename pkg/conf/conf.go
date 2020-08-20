@@ -10,7 +10,10 @@ type Conf struct {
 	API_PORT string `envconfig:"API_PORT" default:"3000"`
 
 	// slack
-	SLACK_TOKEN              string `envconfig:"SLACK_TOKEN"`
+	SLACK_TOKEN string `envconfig:"SLACK_TOKEN"`
+
+	// elasticsearch
+	ES_HOST string `envconfig:"ES_HOST"`
 }
 
 func NewConf(logger *zap.Logger) Conf {
